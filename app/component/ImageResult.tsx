@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import "../styles/images.css";
 import { searchImages } from "../api/imageSearchApi";
@@ -23,35 +23,40 @@ const ImageResult: React.FC<ImageResultProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [sliderValue, setSliderValue] = useState<number>(0);
+  const [lastSearchedQuery, setLastSearchedQuery] = useState<string>("");
 
   const sliderRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchImages = async () => {
-      if (!query.trim()) return;
+  // Create a memoized function to fetch images
+  const fetchImages = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+    
+    setLoading(true);
+    setError(null);
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        const results = await searchImages(query);
-        if (results) {
-          setImages(results);
-        } else {
-          setError("Failed to fetch images");
-        }
-      } catch (error) {
-        // Fixed: Using the error parameter properly
-        console.error("Image search error:", error);
-        setError("An error occurred while fetching images");
-      } finally {
-        setLoading(false);
+    try {
+      const results = await searchImages(searchQuery);
+      if (results) {
+        setImages(results);
+      } else {
+        setError("Failed to fetch images");
       }
-    };
+    } catch (error) {
+      console.error("Image search error:", error);
+      setError("An error occurred while fetching images");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    fetchImages();
-  }, [query]);
+  // Only call the API when the query changes from the last searched query
+  useEffect(() => {
+    if (query.trim() && query !== lastSearchedQuery) {
+      fetchImages(query);
+      setLastSearchedQuery(query);
+    }
+  }, [query, fetchImages, lastSearchedQuery]);
 
   // Handle slider change
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {

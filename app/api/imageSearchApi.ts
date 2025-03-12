@@ -14,7 +14,7 @@ export interface ImageResult {
   
   export const searchImages = async (query: string): Promise<ImageResult[] | null> => {
     try {
-      const searchQuery = `${query} advertisement`;
+      const searchQuery = `${query}`;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
       const searchEngineId = process.env.NEXT_PUBLIC_GOOGLE_SEARCH_ENGINE_ID;
   

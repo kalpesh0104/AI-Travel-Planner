@@ -233,24 +233,31 @@ const DestinationImages = ({ destination }) => {
   // Use the trip planner hook from the service
   const { tripData, planTrip, isLoading, error } = useTripPlanner();
   const [tripPlan, setTripPlan] = useState(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [previousDestination, setPreviousDestination] = useState(null);
   
-  // Fetch data once when destination changes
+  // Fetch data only once when destination changes or on initial load
   useEffect(() => {
-    const fetchData = async () => {
-      if (!destination) return;
-      
-      try {
-        const result = await planTrip(destination);
-        if (result.success && result.data) {
-          setTripPlan(result.data.tripPlan);
+    // Only fetch data if we have a destination and it's either the initial load or the destination has changed
+    if (destination && (isInitialLoad || destination !== previousDestination)) {
+      const fetchData = async () => {
+        try {
+          const result = await planTrip(destination);
+          if (result.success && result.data) {
+            setTripPlan(result.data.tripPlan);
+          }
+          // Update state to prevent unnecessary API calls
+          setIsInitialLoad(false);
+          setPreviousDestination(destination);
+        } catch (err) {
+          console.error("Error fetching trip data:", err);
+          setIsInitialLoad(false); // Still mark as loaded even on error
         }
-      } catch (err) {
-        console.error("Error fetching trip data:", err);
-      }
-    };
-    
-    fetchData();
-  }, [destination, planTrip]);
+      };
+      
+      fetchData();
+    }
+  }, [destination, planTrip, isInitialLoad, previousDestination]);
   
   if (isLoading) {
     return (
@@ -364,7 +371,7 @@ const DestinationImages = ({ destination }) => {
               <div className="grid grid-cols-2 gap-2">
                 {tripPlan.recommendations.hiddenGems.map((item, idx) => (
                   <div key={idx} className="bg-gray-700 rounded-lg p-2">
-                    <p className="text-xs">{item}</p>
+                     <p className="text-xs">{item}</p>
                   </div>
                 ))}
               </div>
