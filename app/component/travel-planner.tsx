@@ -6,8 +6,8 @@ import {
   AlertTriangle, Camera, DollarSign, Compass,
   Globe, Sun, Wind, Users, Bookmark
 } from "lucide-react"; 
-import "@/app/styles/travel.css";
-import { useTripPlanner } from "@/app/api/travel-planner";
+import "../styles/travel.css";
+import { useTripPlanner } from "../api/travel-planner";
 
 // Type definitions
 interface Accommodation {

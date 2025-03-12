@@ -2,7 +2,7 @@
 
 import React, { useState, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import "@/app/styles/page.css";
+import "./styles/page.css";
 
 // Define searchAnimations that was missing from the original code
 const searchAnimations = {
@@ -77,7 +77,7 @@ interface TravelResultsSectionProps {
 const TRAVEL_COMPONENTS: TravelComponentConfig[] = [
   { 
     name: 'DestinationImages', 
-    component: lazy(() => import("@/app/component/travel-planner")), 
+    component: lazy(() => import("./component/travel-planner")), 
     propType: 'destination' 
   }
 ];
