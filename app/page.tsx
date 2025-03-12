@@ -50,6 +50,10 @@ interface TravelParameterProps {
   parameter: string;
 }
 
+interface ImageQueryProps {
+  query: string;
+}
+
 type TravelComponentConfig = 
   | {
       name: string;
@@ -60,6 +64,11 @@ type TravelComponentConfig =
       name: string;
       component: React.LazyExoticComponent<React.ComponentType<TravelParameterProps>>;
       propType: 'parameter';
+    }
+  | {
+      name: string;
+      component: React.LazyExoticComponent<React.ComponentType<ImageQueryProps>>;
+      propType: 'query';
     };
 
 interface TravelSearchFormProps {
@@ -79,6 +88,11 @@ const TRAVEL_COMPONENTS: TravelComponentConfig[] = [
     name: 'DestinationImages', 
     component: lazy(() => import("./component/travel-planner")), 
     propType: 'destination' 
+  },
+  { 
+    name: 'ImageResult', 
+    component: lazy(() => import("./component/ImageResult")), 
+    propType: 'query' 
   }
 ];
 
@@ -138,6 +152,18 @@ const TravelResultsSection: React.FC<TravelResultsSectionProps> = ({ submittedDe
               className="result-card"
             >
               <Component destination={submittedDestination} />
+            </motion.div>
+          );
+        } else if (config.propType === 'query') {
+          const Component = config.component;
+          return (
+            <motion.div
+              key={config.name}
+              variants={searchAnimations.fadeUp}
+              layout
+              className="result-card"
+            >
+              <Component query={submittedDestination} />
             </motion.div>
           );
         }

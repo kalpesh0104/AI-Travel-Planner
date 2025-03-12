@@ -227,8 +227,8 @@ Provide your response in this JSON structure:
   "budgetEstimates": [
     {
       "category": "Expense category",
-      "lowRange": "Low-end budget amount as number",
-      "highRange": "High-end budget amount as number",
+      "lowRange": "Low-end budget amount as number in Indian Rupees (₹)",
+      "highRange": "High-end budget amount as number in Indian Rupees (₹)",
       "notes": "Budget notes and tips"
     }
   ],
@@ -243,13 +243,13 @@ Provide your response in this JSON structure:
 }
 
 Guidelines:
-- For Budget use Indian RS
+- ALL budget estimates MUST be in Indian Rupees (₹) only
 - Include 5 well-researched accommodation options across different price points
 - Provide 8 attractions with detailed descriptions and practical visiting information
 - List 6 restaurant recommendations representing local cuisine and international options
 - Create a detailed daily itinerary for the optimal trip length
 - Include specific travel advisories and safety information
-- Provide realistic budget estimates in USD
+- Provide realistic budget estimates in Indian Rupees (₹) ONLY - not in USD or any other currency
 - Balance tourist highlights with authentic local experiences
 - Include practical transportation advice between attractions
 - Recommend best photo spots and Instagram-worthy locations
@@ -269,7 +269,7 @@ export class TripPlanningService {
   ): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
-
+    
     try {
       const response = await fetch(url, {
         ...options,
@@ -300,16 +300,17 @@ export class TripPlanningService {
     searchUrl.searchParams.append('num', '10');
 
     const response = await this.fetchWithTimeout(searchUrl.toString(), { method: 'GET' });
-
+    
     if (!response.ok) {
       throw new Error(`Google Search API error: ${response.status}`);
     }
-
+    
     const data = await response.json() as GoogleSearchResponse;
+    
     if (!data?.items || !Array.isArray(data.items)) {
       throw new Error('Invalid Google Search API response format');
     }
-
+    
     return data.items.map((item: GoogleSearchItem) => ({
       title: item.title || 'No title available',
       snippet: item.snippet || 'No snippet available',
@@ -330,12 +331,12 @@ export class TripPlanningService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'deepseek-r1-distill-qwen-32b',  // Using the same model as the reference code
+          model: 'deepseek-r1-distill-qwen-32b',
           messages: [
             { role: 'system', content: TRIP_PLANNING_PROMPT },
             { 
               role: 'user', 
-              content: `Analyze these search results for a trip to ${query} and provide a comprehensive travel guide and give me only json format:\n${JSON.stringify(results, null, 2)}` 
+              content: `Analyze these search results for a trip to ${query} and provide a comprehensive travel guide with all budget estimates ONLY in Indian Rupees (₹). Return ONLY valid JSON format with NO explanatory text:\n${JSON.stringify(results, null, 2)}` 
             },
           ],
           temperature: 0.7,
@@ -344,7 +345,7 @@ export class TripPlanningService {
         }),
       }
     );
-
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       throw new Error(
@@ -353,38 +354,57 @@ export class TripPlanningService {
         }`
       );
     }
-
+    
     const data = await response.json() as GroqResponse;
     const tripPlanString = data?.choices?.[0]?.message?.content;
-
+    
     if (!tripPlanString) {
       throw new Error('No trip plan generated from Groq API');
     }
-
-    return JSON.parse(tripPlanString) as TripPlan;
+    
+    try {
+      const parsedPlan = JSON.parse(tripPlanString) as TripPlan;
+      
+      // Validate and ensure budget is in Indian Rupees
+      parsedPlan.budgetEstimates = parsedPlan.budgetEstimates.map(item => {
+        // Ensure budget values are numbers
+        return {
+          ...item,
+          lowRange: typeof item.lowRange === 'string' ? parseInt(item.lowRange.replace(/[^\d]/g, ''), 10) : item.lowRange,
+          highRange: typeof item.highRange === 'string' ? parseInt(item.highRange.replace(/[^\d]/g, ''), 10) : item.highRange
+        };
+      });
+      
+      return parsedPlan;
+    } catch (error) {
+      console.error("Failed to parse trip plan JSON:", error);
+      throw new Error('Invalid trip plan format received from API');
+    }
   }
 
   public static async planTrip(destination: string): Promise<TripPlanningData> {
     if (!destination.trim()) {
       return { success: false, error: 'Destination query cannot be empty' };
     }
-
+    
     try {
       const activeRequest = this.activeRequests.get(destination);
       if (activeRequest) {
         return activeRequest;
       }
-
+      
       this.validateConfiguration();
-
+      
       const newRequest = (async () => {
         try {
           const results = await this.fetchGoogleResults(destination);
+          
           if (results.length === 0) {
             return { success: false, error: 'No search results found for this destination' };
           }
-
+          
           const tripPlan = await this.generateTripPlan(destination, results);
+          
           const response: TripPlanningData = {
             success: true,
             data: {
@@ -393,13 +413,13 @@ export class TripPlanningService {
               timestamp: new Date().toISOString(),
             },
           };
-
+          
           return response;
         } finally {
           this.activeRequests.delete(destination);
         }
       })();
-
+      
       this.activeRequests.set(destination, newRequest);
       return newRequest;
     } catch (error) {
@@ -419,7 +439,7 @@ export const useTripPlanner = () => {
   const planTrip = async (destination: string) => {
     setIsLoading(true);
     setError(null);
-
+    
     try {
       const result = await TripPlanningService.planTrip(destination);
       setTripData(result);
