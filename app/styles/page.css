@@ -144,8 +144,9 @@ body {
  
 
 .glass-toggle {
-  width: 42px;
   height: 42px;
+  background-color: aqua;
+  margin-left: 20px;
   border-radius: 50%;
   border: 1px solid var(--glass-border);
   background: transparent;
@@ -157,7 +158,7 @@ body {
 .glass-toggle::after {
   content: '';
   position: absolute;
-  width: 22px;
+  width: 42px;
   height: 22px;
   background-size: contain;
   background-repeat: no-repeat;
