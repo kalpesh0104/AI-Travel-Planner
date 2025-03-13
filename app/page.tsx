@@ -223,7 +223,7 @@ const Page: React.FC = () => {
         transition={{ duration: 0.5 }}
         className="main-heading"
       >
-        TravelAI Planner
+        Smart Trip Planner
       </motion.h1>
 
       <motion.div layout className="search-section">
