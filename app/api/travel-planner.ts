@@ -107,6 +107,15 @@ interface TripPlanningData {
   error?: string;
 }
 
+interface BookingDetails {
+  destination: string;
+  durationDays: number;
+  startDate?: Date;
+  accommodationPreference?: string;
+  totalBudget?: number;
+  numberOfTravelers?: number;
+}
+
 // Google Search API response interfaces
 interface GoogleSearchItem {
   title?: string;
@@ -259,9 +268,34 @@ Guidelines:
 - Provide packing recommendations specific to the destination
 - Highlight sustainable tourism practices where applicable`;
 
+const ITINERARY_ADJUSTMENT_PROMPT = `As an expert travel planner, adjust the existing itinerary to match the requested number of days (NUM_DAYS) while maintaining the high quality of the trip experience. If shortening the trip, prioritize must-see attractions and essential experiences. If extending the trip, add more hidden gems, relaxation time, or in-depth exploration of key areas.
+
+Current trip information:
+CURRENT_TRIP_DATA
+
+Please provide a revised JSON itinerary array containing exactly NUM_DAYS itinerary days, following this structure for each day:
+{
+  "day": day number as integer,
+  "activities": {
+    "morning": "Morning activity",
+    "afternoon": "Afternoon activity",
+    "evening": "Evening activity"
+  },
+  "meals": {
+    "breakfast": "Optional breakfast recommendation",
+    "lunch": "Optional lunch recommendation",
+    "dinner": "Optional dinner recommendation"
+  },
+  "transportation": "Transportation recommendations for the day",
+  "tips": ["Day-specific travel tips"]
+}
+
+Ensure the itinerary flows logically, with activities in proximity to each other when possible, and provides a balanced experience of the destination.`;
+
 // Main service class
 export class TripPlanningService {
   private static activeRequests = new Map<string, Promise<TripPlanningData>>();
+  private static cachedPlans = new Map<string, TripPlanningData>();
 
   private static async fetchWithTimeout(
     url: string,
@@ -382,12 +416,93 @@ export class TripPlanningService {
     }
   }
 
+  private static async adjustItineraryForDuration(
+    tripPlan: TripPlan, 
+    numDays: number
+  ): Promise<DayPlan[]> {
+    // If current itinerary already matches requested days, return it as is
+    if (tripPlan.itinerary.length === numDays) {
+      return tripPlan.itinerary;
+    }
+
+    // Prepare prompt with current trip data but without the full itinerary
+    const currentTripData = {
+      destination: tripPlan.destination,
+      topAttractions: tripPlan.topAttractions,
+      topRestaurants: tripPlan.topRestaurants,
+      recommendations: tripPlan.recommendations,
+      // Include a sample of the existing itinerary for reference
+      sampleItinerary: tripPlan.itinerary.slice(0, Math.min(3, tripPlan.itinerary.length))
+    };
+
+    const promptWithReplacements = ITINERARY_ADJUSTMENT_PROMPT
+      .replace('NUM_DAYS', numDays.toString())
+      .replace('CURRENT_TRIP_DATA', JSON.stringify(currentTripData, null, 2));
+
+    const response = await this.fetchWithTimeout(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.API_KEYS.GROQ}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'deepseek-r1-distill-qwen-32b',
+          messages: [
+            { role: 'system', content: 'You are an expert travel itinerary planner.' },
+            { role: 'user', content: promptWithReplacements }
+          ],
+          temperature: 0.7,
+          max_tokens: 3000,
+          response_format: { type: 'json_object' },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to adjust itinerary: ${response.statusText}`);
+    }
+
+    const data = await response.json() as GroqResponse;
+    const itineraryString = data?.choices?.[0]?.message?.content;
+
+    if (!itineraryString) {
+      throw new Error('No adjusted itinerary generated');
+    }
+
+    try {
+      const parsedItinerary = JSON.parse(itineraryString) as DayPlan[];
+      
+      // Validate the itinerary has the correct number of days
+      if (!Array.isArray(parsedItinerary) || parsedItinerary.length !== numDays) {
+        throw new Error(`Generated itinerary doesn't have the requested ${numDays} days`);
+      }
+      
+      // Ensure day numbers are sequential
+      return parsedItinerary.map((dayPlan, index) => ({
+        ...dayPlan,
+        day: index + 1
+      }));
+    } catch (error) {
+      console.error("Failed to parse adjusted itinerary:", error);
+      throw new Error('Invalid itinerary format received');
+    }
+  }
+
   public static async planTrip(destination: string): Promise<TripPlanningData> {
     if (!destination.trim()) {
       return { success: false, error: 'Destination query cannot be empty' };
     }
     
     try {
+      // Check cache first
+      const cachedResult = this.cachedPlans.get(destination);
+      if (cachedResult) {
+        return { ...cachedResult };
+      }
+      
+      // Check for ongoing request
       const activeRequest = this.activeRequests.get(destination);
       if (activeRequest) {
         return activeRequest;
@@ -414,6 +529,8 @@ export class TripPlanningService {
             },
           };
           
+          // Cache the result
+          this.cachedPlans.set(destination, { ...response });
           return response;
         } finally {
           this.activeRequests.delete(destination);
@@ -428,13 +545,107 @@ export class TripPlanningService {
       return { success: false, error: errorMessage };
     }
   }
+
+  public static async adjustTripDuration(
+    destination: string, 
+    numDays: number
+  ): Promise<TripPlanningData> {
+    try {
+      // First ensure we have a trip plan for this destination
+      let tripData = this.cachedPlans.get(destination);
+      
+      if (!tripData?.success || !tripData.data) {
+        // If not cached, generate a new trip plan
+        tripData = await this.planTrip(destination);
+        
+        if (!tripData.success || !tripData.data) {
+          return tripData; // Return error from planTrip
+        }
+      }
+      
+      // Create a copy of the trip data to modify
+      const updatedTripData: TripPlanningData = {
+        success: true,
+        data: {
+          ...tripData.data!,
+          tripPlan: {
+            ...tripData.data!.tripPlan
+          },
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      // Adjust the itinerary for the requested duration
+      const adjustedItinerary = await this.adjustItineraryForDuration(
+        updatedTripData.data!.tripPlan, 
+        numDays
+      );
+      
+      // Update the trip plan with the new itinerary
+      updatedTripData.data!.tripPlan.itinerary = adjustedItinerary;
+      
+      // Cache the updated plan (but don't overwrite the original)
+      const cacheKey = `${destination}_${numDays}days`;
+      this.cachedPlans.set(cacheKey, { ...updatedTripData });
+      
+      return updatedTripData;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Trip duration adjustment error:', error);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  public static async bookTrip(bookingDetails: BookingDetails): Promise<{ success: boolean; bookingId?: string; error?: string }> {
+    try {
+      // This would typically connect to a booking service API
+      // For now, we'll simulate a successful booking
+      
+      // Validate basic booking requirements
+      if (!bookingDetails.destination || !bookingDetails.durationDays) {
+        return { 
+          success: false, 
+          error: 'Booking requires at least a destination and duration' 
+        };
+      }
+      
+      // Generate a mock booking ID
+      const bookingId = `BK-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      
+      // In a real implementation, you would:
+      // 1. Connect to a booking service API
+      // 2. Send the booking details
+      // 3. Process payment
+      // 4. Return the booking confirmation
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return { 
+        success: true, 
+        bookingId: bookingId 
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Trip booking error:', error);
+      return { success: false, error: errorMessage };
+    }
+  }
 }
 
-// React hook
+// React hook with enhanced functionality
 export const useTripPlanner = () => {
   const [tripData, setTripData] = useState<TripPlanningData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
+  const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
+  const [bookingStatus, setBookingStatus] = useState<{
+    isBooking: boolean;
+    success?: boolean;
+    bookingId?: string;
+    error?: string;
+  }>({ isBooking: false });
 
   const planTrip = async (destination: string) => {
     setIsLoading(true);
@@ -443,6 +654,18 @@ export const useTripPlanner = () => {
     try {
       const result = await TripPlanningService.planTrip(destination);
       setTripData(result);
+      
+      // Set the initial selected duration to the optimal trip length
+      if (result.success && result.data?.tripPlan.idealTripLength) {
+        setSelectedDuration(result.data.tripPlan.idealTripLength.optimal);
+        
+        // Initialize booking details
+        setBookingDetails({
+          destination: destination,
+          durationDays: result.data.tripPlan.idealTripLength.optimal
+        });
+      }
+      
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -453,9 +676,107 @@ export const useTripPlanner = () => {
     }
   };
 
+  const changeTripDuration = async (numDays: number) => {
+    if (!tripData?.success || !tripData.data) {
+      setError('No trip data available to adjust');
+      return null;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const destination = tripData.data.tripPlan.destination.name;
+      const result = await TripPlanningService.adjustTripDuration(destination, numDays);
+      
+      if (result.success) {
+        setTripData(result);
+        setSelectedDuration(numDays);
+        
+        // Update booking details with new duration
+        setBookingDetails(prev => 
+          prev ? { ...prev, durationDays: numDays } : { destination, durationDays: numDays }
+        );
+      }
+      
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateBookingDetails = (details: Partial<BookingDetails>) => {
+    setBookingDetails(prev => prev ? { ...prev, ...details } : null);
+  };
+
+  const bookTrip = async (additionalDetails?: Partial<BookingDetails>) => {
+    if (!bookingDetails) {
+      setError('No booking details available');
+      return { success: false, error: 'No booking details available' };
+    }
+    
+    const finalBookingDetails = {
+      ...bookingDetails,
+      ...additionalDetails
+    };
+    
+    setBookingStatus({ isBooking: true });
+    
+    try {
+      const result = await TripPlanningService.bookTrip(finalBookingDetails);
+      
+      setBookingStatus({
+        isBooking: false,
+        success: result.success,
+        bookingId: result.bookingId,
+        error: result.error
+      });
+      
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      setBookingStatus({
+        isBooking: false,
+        success: false,
+        error: errorMessage
+      });
+      
+      return { success: false, error: errorMessage };
+    }
+  };
+
   const clearTripData = () => {
     setTripData(null);
     setError(null);
+    setSelectedDuration(null);
+    setBookingDetails(null);
+    setBookingStatus({ isBooking: false });
+  };
+
+  // Calculate available duration options based on the trip plan
+  const getDurationOptions = () => {
+    if (!tripData?.success || !tripData.data?.tripPlan.idealTripLength) {
+      return [];
+    }
+    
+    const { minimum, optimal, extended } = tripData.data.tripPlan.idealTripLength;
+    
+    // Create an array of options ranging from minimum to extended
+    const options = [];
+    for (let i = minimum; i <= extended; i++) {
+      options.push({
+        value: i,
+        label: `${i} Days`,
+        isRecommended: i === optimal
+      });
+    }
+    
+    return options;
   };
 
   return {
@@ -463,6 +784,14 @@ export const useTripPlanner = () => {
     planTrip,
     clearTripData,
     isLoading,
-    error
+    error,
+    // New functionality
+    selectedDuration,
+    durationOptions: getDurationOptions(),
+    changeTripDuration,
+    bookingDetails,
+    updateBookingDetails,
+    bookTrip,
+    bookingStatus
   };
 };

@@ -1,10 +1,10 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { 
   Map, Calendar, Utensils, Hotel, 
   AlertTriangle, Camera, DollarSign, Compass,
-  Globe, Sun, Wind, Users, Bookmark
+  Globe, Sun, Wind, Users, Bookmark, Menu, X,
+  LucideIcon, Clock
 } from "lucide-react"; 
 import { useTripPlanner } from "../api/travel-planner";
 
@@ -101,144 +101,195 @@ interface TripPlan {
   itinerary: DayPlan[];
 }
 
-// Section title component
-const SectionTitle = ({ icon, title }) => (
-  <div className="flex items-center gap-3 mb-4 mt-8">
-    <div className="bg-gray-800 p-2 rounded-lg">
-      {icon}
-    </div>
-    <h2 className="text-xl font-bold">{title}</h2>
-  </div>
+// Component props interfaces
+interface TabButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+interface CardProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+interface AccommodationCardProps {
+  accommodation: Accommodation;
+}
+
+interface AttractionCardProps {
+  attraction: Attraction;
+}
+
+interface RestaurantCardProps {
+  restaurant: Restaurant;
+}
+
+interface DestinationCompactProps {
+  destination: string;
+}
+
+interface DayPlanCardProps {
+  dayPlan: DayPlan;
+}
+
+// Tab button component
+const TabButton: React.FC<TabButtonProps> = ({ icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex items-center gap-2 px-4 py-3 w-full ${active ? 'bg-gray-800 text-white' : 'bg-black text-gray-400'} transition-colors`}
+  >
+    {icon}
+    <span className="text-sm font-medium">{label}</span>
+  </button>
 );
 
 // Card component
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-gray-900/90 border border-gray-800 rounded-lg p-5 shadow-lg ${className}`}>
+const Card: React.FC<CardProps> = ({ children, className = "" }) => (
+  <div className={`bg-black border border-gray-800 rounded-lg p-4 shadow-lg ${className}`}>
     {children}
   </div>
 );
 
-// AccommodationCard component
-const AccommodationCard = ({ accommodation }) => (
-  <Card>
-    <div className="flex items-start gap-3 mb-3">
-      <Hotel className="w-5 h-5 text-gray-400 mt-1" />
-      <div>
-        <h3 className="text-lg font-semibold">{accommodation.name}</h3>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm font-medium bg-gray-800 px-2 py-0.5 rounded">{accommodation.type}</span>
-          <span className="text-sm text-gray-300">{accommodation.priceRange}</span>
-        </div>
-      </div>
-    </div>
-    <div className="space-y-3">
-      <p className="text-sm">{accommodation.description}</p>
-      
-      <div className="mt-3">
-        <h4 className="text-sm font-semibold mb-2">Highlights</h4>
-        <ul className="list-disc list-inside text-sm space-y-1">
-          {accommodation.highlights.map((highlight, idx) => (
-            <li key={idx}>{highlight}</li>
-          ))}
-        </ul>
-      </div>
-      
-      <div className="mt-2">
-        <h4 className="text-sm font-semibold mb-2">Best For</h4>
-        <div className="flex flex-wrap gap-2">
-          {accommodation.bestFor.map((type, idx) => (
-            <span key={idx} className="text-xs px-2 py-1 bg-gray-800 rounded-full">
-              {type}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  </Card>
-);
-
-// AttractionCard component
-const AttractionCard = ({ attraction }) => (
-  <Card>
-    <div className="flex items-start gap-3 mb-3">
-      <Compass className="w-5 h-5 text-gray-400 mt-1" />
-      <div>
-        <h3 className="text-lg font-semibold">{attraction.name}</h3>
-        <span className="text-sm font-medium bg-gray-800 px-2 py-0.5 rounded">{attraction.category}</span>
-      </div>
+// Day Plan Card Component
+const DayPlanCard: React.FC<DayPlanCardProps> = ({ dayPlan }) => (
+  <Card className="mb-4">
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="text-sm font-semibold">Day {dayPlan.day}</h3>
+      <span className="text-xs bg-gray-800 px-2 py-0.5 rounded">{dayPlan.transportation}</span>
     </div>
     
     <div className="space-y-3">
-      <p className="text-sm">{attraction.description}</p>
-      
-      <div className="grid grid-cols-2 gap-3 mt-3">
-        <div className="bg-gray-800 p-3 rounded">
-          <h4 className="text-sm font-semibold">Visit Length</h4>
-          <p className="text-sm">{attraction.idealVisitLength}</p>
+      <div className="bg-gray-900 p-2 rounded">
+        <div className="flex items-center mb-1">
+          <span className="text-xs font-semibold text-gray-400 w-20">Morning</span>
+          <div className="h-px bg-gray-800 flex-grow mx-2"></div>
         </div>
-        <div className="bg-gray-800 p-3 rounded">
-          <h4 className="text-sm font-semibold">Best Time</h4>
-          <p className="text-sm">{attraction.bestTimeToVisit}</p>
-        </div>
+        <p className="text-xs">{dayPlan.activities.morning}</p>
+        {dayPlan.meals.breakfast && (
+          <div className="mt-2 flex items-center gap-1 text-xs">
+            <Utensils className="w-3 h-3 text-gray-500" />
+            <span className="text-gray-400">{dayPlan.meals.breakfast}</span>
+          </div>
+        )}
       </div>
       
-      <div className="mt-2">
-        <h4 className="text-sm font-semibold mb-2">Travel Tips</h4>
-        <ul className="list-disc list-inside text-sm space-y-1">
-          {attraction.travelTips.map((tip, idx) => (
+      <div className="bg-gray-900 p-2 rounded">
+        <div className="flex items-center mb-1">
+          <span className="text-xs font-semibold text-gray-400 w-20">Afternoon</span>
+          <div className="h-px bg-gray-800 flex-grow mx-2"></div>
+        </div>
+        <p className="text-xs">{dayPlan.activities.afternoon}</p>
+        {dayPlan.meals.lunch && (
+          <div className="mt-2 flex items-center gap-1 text-xs">
+            <Utensils className="w-3 h-3 text-gray-500" />
+            <span className="text-gray-400">{dayPlan.meals.lunch}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="bg-gray-900 p-2 rounded">
+        <div className="flex items-center mb-1">
+          <span className="text-xs font-semibold text-gray-400 w-20">Evening</span>
+          <div className="h-px bg-gray-800 flex-grow mx-2"></div>
+        </div>
+        <p className="text-xs">{dayPlan.activities.evening}</p>
+        {dayPlan.meals.dinner && (
+          <div className="mt-2 flex items-center gap-1 text-xs">
+            <Utensils className="w-3 h-3 text-gray-500" />
+            <span className="text-gray-400">{dayPlan.meals.dinner}</span>
+          </div>
+        )}
+      </div>
+    </div>
+    
+    {dayPlan.tips.length > 0 && (
+      <div className="mt-3 bg-gray-800 p-2 rounded">
+        <div className="text-xs font-semibold mb-1 flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" />
+          <span>Tips</span>
+        </div>
+        <ul className="text-xs space-y-1">
+          {dayPlan.tips.map((tip, idx) => (
             <li key={idx}>{tip}</li>
           ))}
         </ul>
       </div>
+    )}
+  </Card>
+);
+
+// Accommodation Card (Compact)
+const AccommodationCard: React.FC<AccommodationCardProps> = ({ accommodation }) => (
+  <Card className="mb-3">
+    <div className="flex items-start gap-2">
+      <Hotel className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
+      <div>
+        <h3 className="text-sm font-semibold">{accommodation.name}</h3>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-xs bg-gray-800 px-2 py-0.5 rounded">{accommodation.type}</span>
+          <span className="text-xs text-gray-400">{accommodation.priceRange}</span>
+        </div>
+        <p className="text-xs mt-2 text-gray-300">{accommodation.description}</p>
+      </div>
     </div>
   </Card>
 );
 
-// RestaurantCard component
-const RestaurantCard = ({ restaurant }) => (
-  <Card>
-    <div className="flex items-start gap-3 mb-3">
-      <Utensils className="w-5 h-5 text-gray-400 mt-1" />
+// Attraction Card (Compact)
+const AttractionCard: React.FC<AttractionCardProps> = ({ attraction }) => (
+  <Card className="mb-3">
+    <div className="flex items-start gap-2">
+      <Compass className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
       <div>
-        <h3 className="text-lg font-semibold">{restaurant.name}</h3>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm font-medium bg-gray-800 px-2 py-0.5 rounded">{restaurant.cuisine}</span>
-          <span className="text-sm text-gray-300">{restaurant.priceRange}</span>
-        </div>
+        <h3 className="text-sm font-semibold">{attraction.name}</h3>
+        <span className="text-xs bg-gray-800 px-2 py-0.5 rounded">{attraction.category}</span>
+        <p className="text-xs mt-2 text-gray-300">{attraction.description}</p>
       </div>
     </div>
-    
-    <div className="space-y-3">
+  </Card>
+);
+
+// Restaurant Card (Compact)
+const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) => (
+  <Card className="mb-3">
+    <div className="flex items-start gap-2">
+      <Utensils className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
       <div>
-        <h4 className="text-sm font-semibold">Specialty</h4>
-        <p className="text-sm">{restaurant.specialty}</p>
-      </div>
-      
-      <div>
-        <h4 className="text-sm font-semibold">Atmosphere</h4>
-        <p className="text-sm">{restaurant.atmosphere}</p>
-      </div>
-      
-      {restaurant.localRecommendation && (
-        <div className="bg-gray-800 px-3 py-1.5 rounded-md text-sm inline-block">
-          Local Recommendation
+        <h3 className="text-sm font-semibold">{restaurant.name}</h3>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-xs bg-gray-800 px-2 py-0.5 rounded">{restaurant.cuisine}</span>
+          <span className="text-xs text-gray-400">{restaurant.priceRange}</span>
         </div>
-      )}
+        <p className="text-xs mt-2 text-gray-300">{restaurant.specialty}</p>
+      </div>
     </div>
   </Card>
 );
 
 // Main component
-const DestinationImages = ({ destination }) => {
-  // Use the trip planner hook from the service
-  const { tripData, planTrip, isLoading, error } = useTripPlanner();
-  const [tripPlan, setTripPlan] = useState(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [previousDestination, setPreviousDestination] = useState(null);
+const DestinationCompact: React.FC<DestinationCompactProps> = ({ destination }) => {
+  const { 
+    tripData, 
+    planTrip, 
+    isLoading, 
+    error, 
+    selectedDuration, 
+    durationOptions, 
+    changeTripDuration 
+  } = useTripPlanner();
+  
+  const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+  const [previousDestination, setPreviousDestination] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('overview');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isDurationSelectorOpen, setIsDurationSelectorOpen] = useState<boolean>(false);
+  const [isChangingDuration, setIsChangingDuration] = useState<boolean>(false);
   
   // Fetch data only once when destination changes or on initial load
   useEffect(() => {
-    // Only fetch data if we have a destination and it's either the initial load or the destination has changed
     if (destination && (isInitialLoad || destination !== previousDestination)) {
       const fetchData = async () => {
         try {
@@ -246,239 +297,390 @@ const DestinationImages = ({ destination }) => {
           if (result.success && result.data) {
             setTripPlan(result.data.tripPlan);
           }
-          // Update state to prevent unnecessary API calls
           setIsInitialLoad(false);
           setPreviousDestination(destination);
         } catch (err) {
           console.error("Error fetching trip data:", err);
-          setIsInitialLoad(false); // Still mark as loaded even on error
+          setIsInitialLoad(false);
         }
       };
       
       fetchData();
     }
   }, [destination, planTrip, isInitialLoad, previousDestination]);
+
+  // Update tripPlan when tripData changes (e.g., after duration change)
+  useEffect(() => {
+    if (tripData?.success && tripData.data) {
+      setTripPlan(tripData.data.tripPlan);
+    }
+  }, [tripData]);
   
-  if (isLoading) {
+  // Handle duration change
+  const handleDurationChange = async (days: number) => {
+    setIsChangingDuration(true);
+    try {
+      await changeTripDuration(days);
+      setIsDurationSelectorOpen(false);
+    } catch (err) {
+      console.error("Error changing trip duration:", err);
+    } finally {
+      setIsChangingDuration(false);
+    }
+  };
+  
+  if (isLoading && isInitialLoad) {
     return (
       <div className="flex justify-center items-center p-8">
-        <div className="w-12 h-12 border-4 border-gray-500 border-t-transparent rounded-full" />
+        <div className="w-8 h-8 border-3 border-gray-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
-
+  
   if (error) {
     return (
-      <div className="p-6 bg-gray-800 rounded-lg text-center">
-        <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-gray-400" />
-        <p>{error}</p>
+      <div className="p-4 bg-black rounded-lg text-center border border-gray-800">
+        <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+        <p className="text-sm">{error}</p>
       </div>
     );
   }
-
+  
   if (!tripPlan) {
     return null;
   }
-
-  const getAverageBudget = (estimates) => {
+  
+  const getAverageBudget = (estimates: BudgetEstimate[]): number => {
     if (!estimates || estimates.length === 0) return 0;
-    const total = estimates.reduce((sum, item) => sum + (item.lowRange + item.highRange) / 2, 0);
+    const total = estimates.reduce((sum: number, item: BudgetEstimate) => sum + (item.lowRange + item.highRange) / 2, 0);
     return Math.round(total / estimates.length);
   };
-
+  
+  const toggleMobileMenu = (): void => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+  
   return (
-    <div className="space-y-8 w-full mx-auto px-4">
-      {/* Destination Overview */}
-      <section className="mb-8">
-        <Card className="bg-gradient-to-r from-gray-900 to-black border border-gray-800">
-          <div className="flex flex-col gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2 text-white">{tripPlan.destination.name}</h1>
-              <div className="flex flex-wrap gap-2 mt-2">
-                <div className="flex items-center gap-1 text-xs bg-gray-800 px-2 py-1 rounded-full">
-                  <Globe className="w-3 h-3" />
-                  <span>{tripPlan.destination.language.join(", ")}</span>
+    <div className="bg-black text-white min-h-screen">
+      {/* Header */}
+      <header className="bg-black border-b border-gray-800 sticky top-0 z-10">
+        <div className="flex justify-between items-center px-4 py-3">
+          <h1 className="text-lg font-bold">{tripPlan.destination.name}</h1>
+          <div className="flex items-center gap-2">
+            {/* Duration Selector Button */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsDurationSelectorOpen(!isDurationSelectorOpen)}
+                className="flex items-center gap-1 bg-gray-800 text-white px-2 py-1 rounded-md text-xs"
+              >
+                <Clock size={14} />
+                <span>{selectedDuration || tripPlan.idealTripLength.optimal} Days</span>
+              </button>
+              
+              {/* Duration Dropdown */}
+              {isDurationSelectorOpen && (
+                <div className="absolute right-0 mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg z-20 w-40">
+                  <div className="p-2 border-b border-gray-700">
+                    <h3 className="text-xs font-semibold">Select Trip Duration</h3>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {durationOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleDurationChange(option.value)}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-700 flex items-center justify-between ${
+                          (selectedDuration || tripPlan.idealTripLength.optimal) === option.value ? 'bg-gray-700' : ''
+                        }`}
+                      >
+                        <span>{option.value} Days</span>
+                        {option.isRecommended && (
+                          <span className="text-gray-400 text-xs">Recommended</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs bg-gray-800 px-2 py-1 rounded-full">
-                  <DollarSign className="w-3 h-3" />
-                  <span>{tripPlan.destination.currency}</span>
-                </div>
-                <div className="flex items-center gap-1 text-xs bg-gray-800 px-2 py-1 rounded-full">
-                  <Sun className="w-3 h-3" />
-                  <span>{tripPlan.destination.climate}</span>
-                </div>
-              </div>
+              )}
             </div>
             
-            <div className="bg-gray-800 rounded-lg p-3">
-              <h3 className="font-semibold mb-2 text-sm">Recommended Trip Length</h3>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-gray-700 rounded p-2">
-                  <div className="text-lg font-bold">{tripPlan.idealTripLength.minimum}</div>
-                  <div className="text-xs">Min</div>
-                </div>
-                <div className="bg-white text-black rounded p-2">
-                  <div className="text-lg font-bold">{tripPlan.idealTripLength.optimal}</div>
-                  <div className="text-xs">Ideal</div>
-                </div>
-                <div className="bg-gray-700 rounded p-2">
-                  <div className="text-lg font-bold">{tripPlan.idealTripLength.extended}</div>
-                  <div className="text-xs">Extended</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="md:col-span-3">
-              <h3 className="text-lg font-semibold mb-2">Overview</h3>
-              <p className="text-sm">{tripPlan.executiveSummary}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Best Time</h3>
-              <ul className="space-y-1 text-sm">
-                {tripPlan.destination.bestTimeToVisit.map((time, idx) => (
-                  <li key={idx} className="flex items-center gap-2">
-                    <div className="bg-gray-800 p-1 rounded">
-                      <Calendar className="w-3 h-3" />
-                    </div>
-                    <span>{time}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-800 rounded-lg p-3">
-              <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <Camera className="w-4 h-4" />
-                Must See
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {tripPlan.recommendations.mustSee.map((item, idx) => (
-                  <div key={idx} className="bg-gray-700 rounded-lg p-2">
-                    <p className="text-xs">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3">
-              <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <Bookmark className="w-4 h-4" />
-                Hidden Gems
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {tripPlan.recommendations.hiddenGems.map((item, idx) => (
-                  <div key={idx} className="bg-gray-700 rounded-lg p-2">
-                     <p className="text-xs">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-      </section>
-      
-      {/* Budget Overview */}
-      <SectionTitle icon={<DollarSign className="w-5 h-5 text-white" />} title="Budget" />
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gray-800 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm">Average Daily Cost</span>
-              <span className="font-bold text-lg">₹{getAverageBudget(tripPlan.budgetEstimates)}</span>
-            </div>
-            <div className="w-full bg-gray-700 rounded-full h-1.5">
-              <div className="bg-white h-1.5 rounded-full" style={{ width: '70%' }}></div>
-            </div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm">Recommended Budget</span>
-              <span className="font-bold text-lg">₹{getAverageBudget(tripPlan.budgetEstimates) * tripPlan.idealTripLength.optimal}</span>
-            </div>
-            <div className="text-xs opacity-80">For {tripPlan.idealTripLength.optimal} days</div>
+            <button 
+              onClick={toggleMobileMenu}
+              className="md:hidden bg-gray-800 p-1 rounded-md"
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
-      </Card>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {tripPlan.budgetEstimates.map((budget, idx) => (
-          <Card key={idx}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium text-sm">{budget.category}</h3>
-              <div className="flex items-center bg-gray-800 px-2 py-0.5 rounded-full text-xs">
-                <span>₹{budget.lowRange} - ₹{budget.highRange}</span>
+      </header>
+      <div className="flex flex-col md:flex-row">
+        {/* Navigation Sidebar */}
+        <nav className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:block md:w-56 bg-black border-r border-gray-800 flex-shrink-0`}>
+          <TabButton 
+            icon={<Globe size={16} />} 
+            label="Overview" 
+            active={activeTab === 'overview'}
+            onClick={() => {setActiveTab('overview'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<Calendar size={16} />} 
+            label="Itinerary" 
+            active={activeTab === 'itinerary'}
+            onClick={() => {setActiveTab('itinerary'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<DollarSign size={16} />} 
+            label="Budget" 
+            active={activeTab === 'budget'}
+            onClick={() => {setActiveTab('budget'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<Hotel size={16} />} 
+            label="Accommodations" 
+            active={activeTab === 'accommodations'}
+            onClick={() => {setActiveTab('accommodations'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<Compass size={16} />} 
+            label="Attractions" 
+            active={activeTab === 'attractions'}
+            onClick={() => {setActiveTab('attractions'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<Utensils size={16} />} 
+            label="Restaurants" 
+            active={activeTab === 'restaurants'}
+            onClick={() => {setActiveTab('restaurants'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<Users size={16} />} 
+            label="Local Tips" 
+            active={activeTab === 'tips'}
+            onClick={() => {setActiveTab('tips'); setIsMobileMenuOpen(false)}}
+          />
+          <TabButton 
+            icon={<AlertTriangle size={16} />} 
+            label="Advisories" 
+            active={activeTab === 'advisories'}
+            onClick={() => {setActiveTab('advisories'); setIsMobileMenuOpen(false)}}
+          />
+        </nav>
+        {/* Content Area */}
+        <main className="flex-grow p-4 overflow-y-auto">
+          {/* Loading overlay when changing duration */}
+          {isChangingDuration && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-gray-800 p-4 rounded-lg flex flex-col items-center">
+                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin mb-2" />
+                <p className="text-sm">Updating your trip...</p>
               </div>
             </div>
-            <p className="text-xs opacity-80">{budget.notes}</p>
-          </Card>
-        ))}
-      </div>
-      
-      {/* Accommodations */}
-      <SectionTitle icon={<Hotel className="w-5 h-5 text-white" />} title="Where to Stay" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2 gap-4">
-        {tripPlan.topAccommodations.map((accommodation, idx) => (
-          <AccommodationCard key={idx} accommodation={accommodation} />
-        ))}
-      </div>
-      
-      {/* Attractions */}
-      <SectionTitle icon={<Compass className="w-5 h-5 text-white" />} title="Attractions" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2 gap-4 mb-6">
-        {tripPlan.topAttractions.map((attraction, idx) => (
-          <AttractionCard key={idx} attraction={attraction} />
-        ))}
-      </div>
-      
-      {/* Restaurants */}
-      <SectionTitle icon={<Utensils className="w-5 h-5 text-white" />} title="Where to Eat" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2 gap-4">
-        {tripPlan.topRestaurants.map((restaurant, idx) => (
-          <RestaurantCard key={idx} restaurant={restaurant} />
-        ))}
-      </div>
-      
-      {/* Local Tips */}
-      <SectionTitle icon={<Users className="w-5 h-5 text-white" />} title="Local Tips" />
-      <div className="grid grid-cols-1 lg:grid-cols-4 md:grid-cols-2 gap-4">
-        {tripPlan.localCustoms.map((custom, idx) => (
-          <Card key={idx} className="border-l-4 border-gray-500">
-            <p className="text-sm">{custom}</p>
-          </Card>
-        ))}
-      </div>
-      
-      {/* Safety */}
-      <SectionTitle icon={<AlertTriangle className="w-5 h-5 text-white" />} title="Travel Advisories" />
-      <div className="space-y-3">
-        {tripPlan.travelAdvisories.map((advisory, idx) => {
-          const severityColors = {
-            low: "bg-gray-800 border-gray-600 text-gray-300",
-            medium: "bg-gray-800 border-gray-500 text-gray-300",
-            high: "bg-gray-800 border-gray-400 text-gray-300"
-          };
+          )}
           
-          return (
-            <div key={idx} className={`${severityColors[advisory.severity]} border rounded-lg p-3`}>
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-sm mb-1">{advisory.type}</h3>
-                  <p className="text-xs mb-2">{advisory.description}</p>
-                  <div className="bg-black/30 p-2 rounded-md text-xs">
-                    <strong>Recommendation:</strong> {advisory.recommendation}
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div>
+              <Card className="mb-4 bg-gradient-to-b from-gray-900 to-black">
+                <div className="flex flex-col gap-3 mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-1 text-xs bg-gray-800 px-2 py-1 rounded-full">
+                      <Globe className="w-3 h-3" />
+                      <span>{tripPlan.destination.language.join(", ")}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs bg-gray-800 px-2 py-1 rounded-full">
+                      <DollarSign className="w-3 h-3" />
+                      <span>{tripPlan.destination.currency}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs bg-gray-800 px-2 py-1 rounded-full">
+                      <Sun className="w-3 h-3" />
+                      <span>{tripPlan.destination.climate}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-900 rounded-lg p-3">
+                    <h3 className="text-xs font-semibold mb-2">Trip Length</h3>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-gray-800 rounded p-1">
+                        <div className="text-sm font-bold">{tripPlan.idealTripLength.minimum}</div>
+                        <div className="text-xs">Min</div>
+                      </div>
+                      <div className={`${selectedDuration === tripPlan.idealTripLength.optimal ? 'bg-white text-black' : 'bg-gray-800'} rounded p-1`}>
+                        <div className="text-sm font-bold">{tripPlan.idealTripLength.optimal}</div>
+                        <div className="text-xs">Ideal</div>
+                      </div>
+                      <div className="bg-gray-800 rounded p-1">
+                        <div className="text-sm font-bold">{tripPlan.idealTripLength.extended}</div>
+                        <div className="text-xs">Extended</div>
+                      </div>
+                    </div>
+                    
+                    {/* Current Duration Indicator */}
+                    {selectedDuration && selectedDuration !== tripPlan.idealTripLength.optimal && (
+                      <div className="mt-2 p-1 bg-gray-800 rounded text-center">
+                        <div className="text-xs">Current plan: <span className="font-bold">{selectedDuration} Days</span></div>
+                      </div>
+                    )}
                   </div>
                 </div>
+                
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold mb-1">Overview</h3>
+                  <p className="text-xs">{tripPlan.executiveSummary}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-900 rounded-lg p-2">
+                    <h3 className="text-xs font-semibold mb-1 flex items-center gap-1">
+                      <Camera className="w-3 h-3" />
+                      Must See
+                    </h3>
+                    <ul className="space-y-1">
+                      {tripPlan.recommendations.mustSee.slice(0, 3).map((item: string, idx: number) => (
+                        <li key={idx} className="text-xs bg-gray-800 p-1 rounded">{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="bg-gray-900 rounded-lg p-2">
+                    <h3 className="text-xs font-semibold mb-1 flex items-center gap-1">
+                      <Bookmark className="w-3 h-3" />
+                      Hidden Gems
+                    </h3>
+                    <ul className="space-y-1">
+                      {tripPlan.recommendations.hiddenGems.slice(0, 3).map((item: string, idx: number) => (
+                        <li key={idx} className="text-xs bg-gray-800 p-1 rounded">{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+              
+              <div className="bg-gray-900 rounded-lg p-3">
+                <h3 className="text-xs font-semibold mb-2">Weather & Best Time</h3>
+                <ul className="space-y-1 text-xs">
+                  {tripPlan.destination.bestTimeToVisit.map((time: string, idx: number) => (
+                    <li key={idx} className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span>{time}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-          );
-        })}
+          )}
+          
+          {/* Itinerary Tab */}
+          {activeTab === 'itinerary' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold">Your {tripPlan.itinerary.length}-Day Itinerary</h3>
+                <button 
+                  onClick={() => setIsDurationSelectorOpen(!isDurationSelectorOpen)}
+                  className="flex items-center gap-1 bg-gray-800 text-white px-2 py-1 rounded-md text-xs"
+                >
+                  <Clock size={14} />
+                  <span>Change Duration</span>
+                </button>
+              </div>
+              
+              {tripPlan.itinerary.map((dayPlan) => (
+                <DayPlanCard key={dayPlan.day} dayPlan={dayPlan} />
+              ))}
+            </div>
+          )}
+          
+          {/* Budget Tab */}
+          {activeTab === 'budget' && (
+            <div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <Card>
+                  <div className="text-center">
+                    <div className="text-xs mb-1">Daily Cost</div>
+                    <div className="text-xl font-bold">₹{getAverageBudget(tripPlan.budgetEstimates)}</div>
+                  </div>
+                </Card>
+                <Card>
+                  <div className="text-center">
+                    <div className="text-xs mb-1">Total ({selectedDuration || tripPlan.idealTripLength.optimal} days)</div>
+                    <div className="text-xl font-bold">₹{getAverageBudget(tripPlan.budgetEstimates) * (selectedDuration || tripPlan.idealTripLength.optimal)}</div>
+                  </div>
+                </Card>
+              </div>
+              
+              <h3 className="text-sm font-semibold mb-2">Breakdown</h3>
+              {tripPlan.budgetEstimates.map((budget: BudgetEstimate, idx: number) => (
+                <Card key={idx} className="mb-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs">{budget.category}</h4>
+                    <div className="bg-gray-800 px-2 py-0.5 rounded-full text-xs">
+                      ₹{budget.lowRange} - ₹{budget.highRange}
+                    </div>
+                  </div>
+                  <p className="text-xs opacity-70 mt-1">{budget.notes}</p>
+                </Card>
+              ))}
+            </div>
+          )}
+          {/* Accommodations Tab */}
+          {activeTab === 'accommodations' && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Where to Stay</h3>
+              {tripPlan.topAccommodations.map((accommodation: Accommodation, idx: number) => (
+                <AccommodationCard key={idx} accommodation={accommodation} />
+              ))}
+            </div>
+          )}
+          {/* Attractions Tab */}
+          {activeTab === 'attractions' && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2">What to See & Do</h3>
+              {tripPlan.topAttractions.map((attraction: Attraction, idx: number) => (
+                <AttractionCard key={idx} attraction={attraction} />
+              ))}
+            </div>
+          )}
+          {/* Restaurants Tab */}
+          {activeTab === 'restaurants' && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Where to Eat</h3>
+              {tripPlan.topRestaurants.map((restaurant: Restaurant, idx: number) => (
+                <RestaurantCard key={idx} restaurant={restaurant} />
+              ))}
+            </div>
+          )}
+          {/* Local Tips Tab */}
+          {activeTab === 'tips' && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Local Customs & Tips</h3>
+              {tripPlan.localCustoms.map((custom: string, idx: number) => (
+                <Card key={idx} className="mb-2 border-l-2 border-gray-700">
+                  <p className="text-xs">{custom}</p>
+                </Card>
+              ))}
+            </div>
+          )}
+          {/* Advisories Tab */}
+          {activeTab === 'advisories' && (
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Travel Advisories</h3>
+              {tripPlan.travelAdvisories.map((advisory: TravelAdvisory, idx: number) => (
+                <Card key={idx} className="mb-2 border-l-2 border-gray-700">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-400" />
+                    <div>
+                      <h4 className="text-xs font-semibold">{advisory.type}</h4>
+                      <p className="text-xs mt-1 text-gray-300">{advisory.description}</p>
+                      <div className="bg-gray-900 p-2 rounded mt-2 text-xs">
+                        <strong>Recommendation:</strong> {advisory.recommendation}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );
 };
 
-export default DestinationImages;
+export default DestinationCompact;
